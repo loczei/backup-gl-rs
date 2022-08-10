@@ -69,7 +69,7 @@ pub struct Builder {
 }
 
 pub struct ShaderProgram {
-    id: u32,
+    pub id: u32,
 }
 
 impl Builder {
@@ -125,12 +125,28 @@ impl Drop for ShaderProgram {
     }
 }
 
+macro_rules! uniform {
+    ($self:ident, $uniform_name:ident, $name:expr, $($arg:expr),+) => {
+        {
+            let c_str = CString::new($name.as_bytes()).unwrap();
+
+            unsafe { 
+                gl::$uniform_name(gl::GetUniformLocation($self.id, c_str.as_ptr()), $($arg), +); 
+            }
+        }
+    };
+}
+
+pub(crate) use uniform;
+
 // true == shader, false == program
 fn check_errors(id: u32, t: bool) {
     let mut success: i32 = i32::from(gl::FALSE);
     let mut info_log = Vec::with_capacity(512);
     
     unsafe {
+        info_log.set_len(512 - 1);
+
         if t {
             gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
         } else {

@@ -3,28 +3,17 @@ extern crate gl;
 extern crate glfw;
 use glfw::{Action, Context, Key};
 
-use std::ffi::{CString, c_void};
+use std::ffi::{ CString, c_void};
 
 
-mod shader_program;
+#[macro_use] mod shader_program;
 mod buffer;
+mod texture;
+use texture::Texture;
 use buffer::{Buffer, BufferType, DrawType};
 mod vertex_array;
 use vertex_array::VertexArray;
 use shader_program::{ Shader, ShaderProgram, ShaderType };
-
-
-macro_rules! uniform {
-    ($self:ident, $uniform_name:ident, $name:expr, $($arg:expr),+) => {
-        {
-            let c_str = CString::new($name.as_bytes()).unwrap();
-
-            unsafe { 
-                gl::$uniform_name(gl::GetUniformLocation($self.id, c_str.as_ptr()), $($arg), +); 
-            }
-        }
-    };
-}
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -52,27 +41,35 @@ fn main() {
         .attach(Shader::from_file("shaders/vertex.vert", ShaderType::Vertex))
         .attach(Shader::from_file("shaders/fragment.frag", ShaderType::Fragment))
         .link();
+   
+    Texture::active_number(0);
+    let mut texture = Texture::from_file("resources/container.jpg");
+    texture.set_activate_number(0);
 
-    let verticies: [f32; 18] = [
-        0.5, -0.5, 0.0, 1., 0., 0.,
-        -0.5, -0.5, 0.0, 0., 1., 0.,
-        0., 0.5, 0.0, 0., 0., 1.,
-        // -0.5, 0.5, 0.0, 1., 1., 1.,
+    Texture::active_number(0);
+    let mut texture1 = Texture::from_file("resources/awesomeface.png");
+    texture1.set_activate_number(1);
+
+    let verticies: [f32; 32] = [
+         0.5,  0.5, 0., 1., 0., 0., 1., 1.,
+         0.5, -0.5, 0., 0., 1., 0., 1., 0.,
+        -0.5, -0.5, 0., 0., 0., 1., 0., 0.,
+        -0.5,  0.5, 0., 1., 1., 1., 0., 1.
     ];
 
-    // let indices: [i32; 6] = [
-    //     0, 1, 3,
-    //     1, 2, 3
-    // ];
+    let indices: [i32; 6] = [
+        0, 1, 3,
+        1, 2, 3
+    ];
     
     let vbo = Buffer::new(BufferType::Array);
-    // let ebo = Buffer::new(BufferType::ElementArray);
+    let ebo = Buffer::new(BufferType::ElementArray);
     let vao = VertexArray::new();
 
     vao.bind();
 
-    vbo.data::<f32, 18>(verticies, DrawType::StaticDraw);
-    // ebo.data::<i32, 6>(indices, DrawType::StaticDraw);
+    vbo.data::<f32, 32>(verticies, DrawType::StaticDraw);
+    ebo.data::<i32, 6>(indices, DrawType::StaticDraw);
 
     unsafe {
         gl::VertexAttribPointer(
@@ -80,10 +77,9 @@ fn main() {
             3, 
             gl::FLOAT, 
             gl::FALSE, 
-            (6 * std::mem::size_of::<f32>()) as i32, 
+            (8 * std::mem::size_of::<f32>()) as i32, 
             std::ptr::null()
         );
-
         gl::EnableVertexAttribArray(0);
 
         gl::VertexAttribPointer(
@@ -91,12 +87,25 @@ fn main() {
             3,
             gl::FLOAT,
             gl::FALSE,
-            (6 * std::mem::size_of::<f32>()) as i32,
+            (8 * std::mem::size_of::<f32>()) as i32,
             (3 * std::mem::size_of::<f32>()) as i32 as *const c_void
         );
-
         gl::EnableVertexAttribArray(1);
+        
+        gl::VertexAttribPointer(
+            2,
+            2,
+            gl::FLOAT,
+            gl::FALSE,
+            (8 * std::mem::size_of::<f32>()) as i32,
+            (6 * std::mem::size_of::<f32>()) as i32 as *const c_void
+        ); 
+        gl::EnableVertexAttribArray(2);
     }
+    
+    shader_program.use_program();
+    shader_program::uniform!(shader_program, Uniform1i, "texture1", 0);
+    shader_program::uniform!(shader_program, Uniform1i, "texture2", 1);
 
     VertexArray::unbind();
 
@@ -111,12 +120,14 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
+        texture.bind();
+        texture1.bind();
         shader_program.use_program();
         vao.bind();
 
         unsafe {
-            // gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
-            gl::DrawArrays(gl::TRIANGLES, 0, 3);
+            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
+            // gl::DrawArrays(gl::TRIANGLES, 0, 3);
         }
 
         window.swap_buffers();

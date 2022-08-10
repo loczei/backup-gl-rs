@@ -1,6 +1,5 @@
 extern crate gl;
 
-use std::ptr;
 use std::ffi::c_void;
 
 use gl::types::GLenum;
