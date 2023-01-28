@@ -16,6 +16,51 @@ mod vertex_array;
 use shader_program::{Shader, ShaderProgram, ShaderType};
 use vertex_array::VertexArray;
 
+#[rustfmt::skip]
+const VERTICIES: [f32; 180] = [
+    -0.5, -0.5, -0.5,  0.0, 0.0,
+    0.5, -0.5, -0.5,  1.0, 0.0,
+    0.5,  0.5, -0.5,  1.0, 1.0,
+    0.5,  0.5, -0.5,  1.0, 1.0,
+    -0.5,  0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 0.0,
+
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+    0.5, -0.5,  0.5,  1.0, 0.0,
+    0.5,  0.5,  0.5,  1.0, 1.0,
+    0.5,  0.5,  0.5,  1.0, 1.0,
+    -0.5,  0.5,  0.5,  0.0, 1.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+
+    -0.5,  0.5,  0.5,  1.0, 0.0,
+    -0.5,  0.5, -0.5,  1.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+    -0.5,  0.5,  0.5,  1.0, 0.0,
+
+    0.5,  0.5,  0.5,  1.0, 0.0,
+    0.5,  0.5, -0.5,  1.0, 1.0,
+    0.5, -0.5, -0.5,  0.0, 1.0,
+    0.5, -0.5, -0.5,  0.0, 1.0,
+    0.5, -0.5,  0.5,  0.0, 0.0,
+    0.5,  0.5,  0.5,  1.0, 0.0,
+
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+    0.5, -0.5, -0.5,  1.0, 1.0,
+    0.5, -0.5,  0.5,  1.0, 0.0,
+    0.5, -0.5,  0.5,  1.0, 0.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+
+    -0.5,  0.5, -0.5,  0.0, 1.0,
+    0.5,  0.5, -0.5,  1.0, 1.0,
+    0.5,  0.5,  0.5,  1.0, 0.0,
+    0.5,  0.5,  0.5,  1.0, 0.0,
+    -0.5,  0.5,  0.5,  0.0, 0.0,
+    -0.5,  0.5, -0.5,  0.0, 1.0
+];
+
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
 
@@ -36,7 +81,21 @@ fn main() {
 
     unsafe {
         gl::Viewport(0, 0, 800, 600);
+        gl::Enable(gl::DEPTH_TEST);
     }
+
+    let cube_positions: [glm::Vec3; 10] = [
+        glm::vec3(0.0, 0.0, 0.0),
+        glm::vec3(2.0, 5.0, -15.0),
+        glm::vec3(-1.5, -2.2, -2.5),
+        glm::vec3(-3.8, -2.0, -12.3),
+        glm::vec3(2.4, -0.4, -3.5),
+        glm::vec3(-1.7, 3.0, -7.5),
+        glm::vec3(1.3, -2.0, -2.5),
+        glm::vec3(1.5, 2.0, -2.5),
+        glm::vec3(1.5, 0.2, -1.5),
+        glm::vec3(-1.3, 1.0, -1.5),
+    ];
 
     let shader_program = ShaderProgram::builder()
         .attach(Shader::from_file("shaders/vertex.vert", ShaderType::Vertex))
@@ -54,21 +113,12 @@ fn main() {
     let mut texture1 = Texture::from_file("resources/awesomeface.png");
     texture1.set_activate_number(1);
 
-    let verticies: [f32; 32] = [
-        0.5, 0.5, 0., 1., 0., 0., 1., 1., 0.5, -0.5, 0., 0., 1., 0., 1., 0., -0.5, -0.5, 0., 0.,
-        0., 1., 0., 0., -0.5, 0.5, 0., 1., 1., 1., 0., 1.,
-    ];
-
-    let indices: [i32; 6] = [0, 1, 3, 1, 2, 3];
-
     let vbo = Buffer::new(BufferType::Array);
-    let ebo = Buffer::new(BufferType::ElementArray);
     let vao = VertexArray::new();
 
     vao.bind();
 
-    vbo.data::<f32, 32>(verticies, DrawType::StaticDraw);
-    ebo.data::<i32, 6>(indices, DrawType::StaticDraw);
+    vbo.data::<f32, 180>(VERTICIES, DrawType::StaticDraw);
 
     unsafe {
         gl::VertexAttribPointer(
@@ -76,30 +126,20 @@ fn main() {
             3,
             gl::FLOAT,
             gl::FALSE,
-            (8 * std::mem::size_of::<f32>()) as i32,
+            (5 * std::mem::size_of::<f32>()) as i32,
             std::ptr::null(),
         );
         gl::EnableVertexAttribArray(0);
 
         gl::VertexAttribPointer(
             1,
-            3,
+            2,
             gl::FLOAT,
             gl::FALSE,
-            (8 * std::mem::size_of::<f32>()) as i32,
+            (5 * std::mem::size_of::<f32>()) as i32,
             (3 * std::mem::size_of::<f32>()) as i32 as *const c_void,
         );
         gl::EnableVertexAttribArray(1);
-
-        gl::VertexAttribPointer(
-            2,
-            2,
-            gl::FLOAT,
-            gl::FALSE,
-            (8 * std::mem::size_of::<f32>()) as i32,
-            (6 * std::mem::size_of::<f32>()) as i32 as *const c_void,
-        );
-        gl::EnableVertexAttribArray(2);
     }
 
     shader_program.use_program();
@@ -108,6 +148,11 @@ fn main() {
 
     VertexArray::unbind();
 
+    let mut view = glm::Mat4::identity();
+    view = glm::translate(&view, &glm::vec3(0., 0., -3.));
+
+    let projection = glm::perspective(800. / 600., (45f32).to_radians(), 0.1, 100.);
+
     while !window.should_close() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
@@ -115,13 +160,9 @@ fn main() {
         }
 
         unsafe {
-            gl::ClearColor(0.2, 0.3, 0.3, 1.);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::ClearColor(0., 0., 0., 1.);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
-
-        let mut trans = glm::Mat4::identity();
-        trans = glm::rotate(&trans, glfw.get_time() as f32, &glm::vec3(0., 0., 1.));
-        trans = glm::translate(&trans, &glm::vec3(0., 0., 0.));
 
         texture.bind();
         texture1.bind();
@@ -131,17 +172,41 @@ fn main() {
         shader_program::uniform!(
             shader_program,
             UniformMatrix4fv,
-            "transform",
+            "view",
             1,
             gl::FALSE,
-            glm::value_ptr(&trans).as_ptr()
+            glm::value_ptr(&view).as_ptr()
+        );
+
+        shader_program::uniform!(
+            shader_program,
+            UniformMatrix4fv,
+            "projection",
+            1,
+            gl::FALSE,
+            glm::value_ptr(&projection).as_ptr()
         );
 
         vao.bind();
 
-        unsafe {
-            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
-            // gl::DrawArrays(gl::TRIANGLES, 0, 3);
+        for (i, position) in cube_positions.iter().enumerate() {
+            let mut model = glm::Mat4::identity();
+            model = glm::translate(&model, position);
+            let angle = glfw.get_time() + i as f64;
+            model = glm::rotate(&model, angle as f32, &glm::vec3(1., 0.3, 0.5));
+
+            shader_program::uniform!(
+                shader_program,
+                UniformMatrix4fv,
+                "model",
+                1,
+                gl::FALSE,
+                glm::value_ptr(&model).as_ptr()
+            );
+
+            unsafe {
+                gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            }
         }
 
         window.swap_buffers();
