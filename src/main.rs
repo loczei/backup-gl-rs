@@ -2,18 +2,19 @@ extern crate gl;
 
 extern crate glfw;
 use glfw::{Action, Context, Key};
+use nalgebra_glm as glm;
 
-use std::ffi::{ CString, c_void};
+use std::ffi::{c_void, CString};
 
-
-#[macro_use] mod shader_program;
+#[macro_use]
+mod shader_program;
 mod buffer;
 mod texture;
-use texture::Texture;
 use buffer::{Buffer, BufferType, DrawType};
+use texture::Texture;
 mod vertex_array;
+use shader_program::{Shader, ShaderProgram, ShaderType};
 use vertex_array::VertexArray;
-use shader_program::{ Shader, ShaderProgram, ShaderType };
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -39,9 +40,12 @@ fn main() {
 
     let shader_program = ShaderProgram::builder()
         .attach(Shader::from_file("shaders/vertex.vert", ShaderType::Vertex))
-        .attach(Shader::from_file("shaders/fragment.frag", ShaderType::Fragment))
+        .attach(Shader::from_file(
+            "shaders/fragment.frag",
+            ShaderType::Fragment,
+        ))
         .link();
-   
+
     Texture::active_number(0);
     let mut texture = Texture::from_file("resources/container.jpg");
     texture.set_activate_number(0);
@@ -51,17 +55,12 @@ fn main() {
     texture1.set_activate_number(1);
 
     let verticies: [f32; 32] = [
-         0.5,  0.5, 0., 1., 0., 0., 1., 1.,
-         0.5, -0.5, 0., 0., 1., 0., 1., 0.,
-        -0.5, -0.5, 0., 0., 0., 1., 0., 0.,
-        -0.5,  0.5, 0., 1., 1., 1., 0., 1.
+        0.5, 0.5, 0., 1., 0., 0., 1., 1., 0.5, -0.5, 0., 0., 1., 0., 1., 0., -0.5, -0.5, 0., 0.,
+        0., 1., 0., 0., -0.5, 0.5, 0., 1., 1., 1., 0., 1.,
     ];
 
-    let indices: [i32; 6] = [
-        0, 1, 3,
-        1, 2, 3
-    ];
-    
+    let indices: [i32; 6] = [0, 1, 3, 1, 2, 3];
+
     let vbo = Buffer::new(BufferType::Array);
     let ebo = Buffer::new(BufferType::ElementArray);
     let vao = VertexArray::new();
@@ -73,12 +72,12 @@ fn main() {
 
     unsafe {
         gl::VertexAttribPointer(
-            0, 
-            3, 
-            gl::FLOAT, 
-            gl::FALSE, 
-            (8 * std::mem::size_of::<f32>()) as i32, 
-            std::ptr::null()
+            0,
+            3,
+            gl::FLOAT,
+            gl::FALSE,
+            (8 * std::mem::size_of::<f32>()) as i32,
+            std::ptr::null(),
         );
         gl::EnableVertexAttribArray(0);
 
@@ -88,21 +87,21 @@ fn main() {
             gl::FLOAT,
             gl::FALSE,
             (8 * std::mem::size_of::<f32>()) as i32,
-            (3 * std::mem::size_of::<f32>()) as i32 as *const c_void
+            (3 * std::mem::size_of::<f32>()) as i32 as *const c_void,
         );
         gl::EnableVertexAttribArray(1);
-        
+
         gl::VertexAttribPointer(
             2,
             2,
             gl::FLOAT,
             gl::FALSE,
             (8 * std::mem::size_of::<f32>()) as i32,
-            (6 * std::mem::size_of::<f32>()) as i32 as *const c_void
-        ); 
+            (6 * std::mem::size_of::<f32>()) as i32 as *const c_void,
+        );
         gl::EnableVertexAttribArray(2);
     }
-    
+
     shader_program.use_program();
     shader_program::uniform!(shader_program, Uniform1i, "texture1", 0);
     shader_program::uniform!(shader_program, Uniform1i, "texture2", 1);
@@ -120,9 +119,24 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
+        let mut trans = glm::Mat4::identity();
+        trans = glm::rotate(&trans, glfw.get_time() as f32, &glm::vec3(0., 0., 1.));
+        trans = glm::translate(&trans, &glm::vec3(0., 0., 0.));
+
         texture.bind();
         texture1.bind();
+
         shader_program.use_program();
+
+        shader_program::uniform!(
+            shader_program,
+            UniformMatrix4fv,
+            "transform",
+            1,
+            gl::FALSE,
+            glm::value_ptr(&trans).as_ptr()
+        );
+
         vao.bind();
 
         unsafe {
@@ -146,15 +160,14 @@ fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
             window.set_should_close(true);
         }
 
-        glfw::WindowEvent::Key(Key::F1, _, Action::Press, _) => {
-            unsafe { gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE); }
-        }
+        glfw::WindowEvent::Key(Key::F1, _, Action::Press, _) => unsafe {
+            gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
+        },
 
-        glfw::WindowEvent::Key(Key::F2, _, Action::Press, _) => {
-            unsafe { gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL); }
-        }
+        glfw::WindowEvent::Key(Key::F2, _, Action::Press, _) => unsafe {
+            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
+        },
 
         _ => {}
     }
 }
-

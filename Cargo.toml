@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 gl = "0.6.0"
 glfw = "0.45.0"
-cgmath = "0.18.0"
 image = "0.24.3"
+nalgebra-glm = "0.18.0"
