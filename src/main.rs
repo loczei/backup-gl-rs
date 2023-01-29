@@ -4,7 +4,10 @@ extern crate glfw;
 use glfw::{Action, Context, Key};
 use nalgebra_glm as glm;
 
-use std::ffi::{c_void, CString};
+use std::{
+    ffi::{c_void, CString},
+    time::{Duration, Instant},
+};
 
 #[macro_use]
 mod shader_program;
@@ -153,6 +156,8 @@ fn main() {
 
     let projection = glm::perspective(800. / 600., (45f32).to_radians(), 0.1, 100.);
 
+    let mut time = Instant::now();
+    let mut counter = 0;
     while !window.should_close() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
@@ -207,6 +212,14 @@ fn main() {
             unsafe {
                 gl::DrawArrays(gl::TRIANGLES, 0, 36);
             }
+        }
+
+        counter += 1;
+        if time.elapsed() >= Duration::from_secs(1) {
+            println!("FPS: {}", counter);
+
+            time = Instant::now();
+            counter = 0;
         }
 
         window.swap_buffers();
