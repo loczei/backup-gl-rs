@@ -1,7 +1,7 @@
 extern crate gl;
 
 extern crate glfw;
-use glfw::{Action, Context, Key};
+use glfw::{Action, Context, CursorMode, Key};
 use nalgebra_glm as glm;
 
 use std::{
@@ -18,6 +18,8 @@ use texture::Texture;
 mod vertex_array;
 use shader_program::{Shader, ShaderProgram, ShaderType};
 use vertex_array::VertexArray;
+mod camera;
+use camera::Camera;
 
 #[rustfmt::skip]
 const VERTICIES: [f32; 180] = [
@@ -79,6 +81,9 @@ fn main() {
     window.set_key_polling(true);
     window.make_current();
     window.set_framebuffer_size_polling(true);
+    window.set_scroll_polling(true);
+    window.set_cursor_pos_polling(true);
+    window.set_cursor_mode(CursorMode::Disabled);
 
     gl::load_with(|s| window.get_proc_address(s).cast());
 
@@ -151,18 +156,25 @@ fn main() {
 
     VertexArray::unbind();
 
-    let mut view = glm::Mat4::identity();
-    view = glm::translate(&view, &glm::vec3(0., 0., -3.));
-
+    let mut cam = Camera::default();
     let projection = glm::perspective(800. / 600., (45f32).to_radians(), 0.1, 100.);
 
     let mut time = Instant::now();
     let mut counter = 0;
+
+    let mut delta;
+    let mut last_frame = glfw.get_time();
     while !window.should_close() {
+        let current_frame = glfw.get_time();
+        delta = current_frame - last_frame;
+        last_frame = current_frame;
+
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
-            handle_window_event(&mut window, event);
+            handle_window_event(&mut window, event.clone());
         }
+
+        cam.process_input(&window, delta);
 
         unsafe {
             gl::ClearColor(0., 0., 0., 1.);
@@ -180,7 +192,7 @@ fn main() {
             "view",
             1,
             gl::FALSE,
-            glm::value_ptr(&view).as_ptr()
+            glm::value_ptr(&cam.view_matrix()).as_ptr()
         );
 
         shader_program::uniform!(
