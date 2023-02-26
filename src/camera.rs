@@ -9,7 +9,6 @@ pub struct Camera {
     last_mouse_pos: glm::Vec2,
     yaw: f32,
     pitch: f32,
-    fov: f32,
 }
 
 impl Camera {
