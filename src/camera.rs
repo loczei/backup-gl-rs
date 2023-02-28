@@ -76,7 +76,6 @@ impl Default for Camera {
             last_mouse_pos: glm::vec2(400., 300.),
             yaw: -90.,
             pitch: 0.,
-            fov: 45.,
         }
     }
 }
