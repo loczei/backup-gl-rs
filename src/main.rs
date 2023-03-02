@@ -1,8 +1,22 @@
 extern crate gl;
 
 extern crate glfw;
-use glfw::{Action, Context, CursorMode, Key};
+use glutin::{
+    config::ConfigTemplateBuilder,
+    context::ContextAttributesBuilder,
+    display::GetGlDisplay,
+    prelude::{GlConfig, GlDisplay, NotCurrentGlContextSurfaceAccessor},
+    surface::GlSurface,
+};
+use glutin_winit::{DisplayBuilder, GlWindow};
 use nalgebra_glm as glm;
+use raw_window_handle::HasRawWindowHandle;
+use winit::{
+    dpi::Pixel,
+    event::{DeviceEvent, ElementState, Event, VirtualKeyCode, WindowEvent},
+    event_loop::EventLoop,
+    window::{CursorGrabMode, WindowBuilder},
+};
 
 use std::{
     ffi::{c_void, CString},
@@ -67,25 +81,62 @@ const VERTICIES: [f32; 180] = [
 ];
 
 fn main() {
-    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+    let event_loop = EventLoop::new();
 
-    glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
-    glfw.window_hint(glfw::WindowHint::OpenGlProfile(
-        glfw::OpenGlProfileHint::Core,
-    ));
+    let window_builder = WindowBuilder::new().with_title("Learn OpenGL");
 
-    let (mut window, events) = glfw
-        .create_window(800, 600, "OpenGL", glfw::WindowMode::Windowed)
-        .expect("Failed to create window!");
+    let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
 
-    window.set_key_polling(true);
-    window.make_current();
-    window.set_framebuffer_size_polling(true);
-    window.set_scroll_polling(true);
-    window.set_cursor_pos_polling(true);
-    window.set_cursor_mode(CursorMode::Disabled);
+    let (window, gl_config) = display_builder
+        .build(&event_loop, ConfigTemplateBuilder::new(), |configs| {
+            configs
+                .reduce(|a, b| {
+                    if a.num_samples() > b.num_samples() {
+                        a
+                    } else {
+                        b
+                    }
+                })
+                .unwrap()
+        })
+        .unwrap();
 
-    gl::load_with(|s| window.get_proc_address(s).cast());
+    let window = window.unwrap();
+
+    let gl_display = gl_config.display();
+
+    let attrs = window.build_surface_attributes(<_>::default());
+    let gl_surface = unsafe {
+        gl_display
+            .create_window_surface(&gl_config, &attrs)
+            .unwrap()
+    };
+
+    let context_attrs = ContextAttributesBuilder::new().build(Some(window.raw_window_handle()));
+    let gl_context = unsafe {
+        gl_display
+            .create_context(&gl_config, &context_attrs)
+            .unwrap()
+            .make_current(&gl_surface)
+            .unwrap()
+    };
+
+    gl::load_with(|s| {
+        let s = CString::new(s).unwrap();
+        gl_display.get_proc_address(s.as_c_str()).cast()
+    });
+
+    let glow = unsafe {
+        glow::Context::from_loader_function(|s| {
+            let s = CString::new(s).unwrap();
+
+            gl_display.get_proc_address(&s)
+        })
+    };
+
+    let glow = std::sync::Arc::new(glow);
+
+    let mut egui = egui_glow::EguiGlow::new(&event_loop, glow, None);
 
     unsafe {
         gl::Viewport(0, 0, 800, 600);
@@ -162,102 +213,129 @@ fn main() {
     let mut time = Instant::now();
     let mut counter = 0;
 
-    let mut delta;
-    let mut last_frame = glfw.get_time();
-    while !window.should_close() {
-        let current_frame = glfw.get_time();
-        delta = current_frame - last_frame;
-        last_frame = current_frame;
+    let start_time = Instant::now();
 
-        glfw.poll_events();
-        for (_, event) in glfw::flush_messages(&events) {
-            handle_window_event(&mut window, event.clone());
-        }
+    let mut delta = 0f32;
+    let mut last_frame = Instant::now();
 
-        cam.process_input(&window, delta);
+    window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+    window.set_cursor_visible(false);
 
-        unsafe {
-            gl::ClearColor(0., 0., 0., 1.);
-            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-        }
+    let mut keys_pushed: [bool; 165] = [false; 165];
 
-        texture.bind();
-        texture1.bind();
+    event_loop.run(move |event, _, control_flow| match event {
+        Event::WindowEvent { event, .. } => match event {
+            WindowEvent::CloseRequested => {
+                control_flow.set_exit();
+            }
+            WindowEvent::Resized(size) => unsafe {
+                gl::Viewport(0, 0, size.width.cast(), size.height.cast())
+            },
+            _ => (),
+        },
+        Event::DeviceEvent { event, .. } => match event {
+            DeviceEvent::Key(input) => {
+                let key = input.virtual_keycode.unwrap();
 
-        shader_program.use_program();
+                if input.state == ElementState::Released {
+                    keys_pushed[key as usize] = false;
+                    return;
+                }
 
-        shader_program::uniform!(
-            shader_program,
-            UniformMatrix4fv,
-            "view",
-            1,
-            gl::FALSE,
-            glm::value_ptr(&cam.view_matrix()).as_ptr()
-        );
+                keys_pushed[key as usize] = true;
 
-        shader_program::uniform!(
-            shader_program,
-            UniformMatrix4fv,
-            "projection",
-            1,
-            gl::FALSE,
-            glm::value_ptr(&projection).as_ptr()
-        );
+                match key {
+                    VirtualKeyCode::F1 => {
+                        unsafe { gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE) };
+                    }
+                    VirtualKeyCode::F2 => {
+                        unsafe { gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL) };
+                    }
+                    VirtualKeyCode::Escape => {
+                        control_flow.set_exit();
+                    }
+                    _ => (),
+                }
+            }
+            DeviceEvent::MouseMotion { delta } => {
+                cam.mouse_input(delta);
+            }
+            _ => (),
+        },
+        Event::MainEventsCleared => {
+            delta = last_frame.elapsed().as_secs_f32();
+            last_frame = Instant::now();
 
-        vao.bind();
+            egui.run(&window, |egui_ctx| {
+                egui::SidePanel::left("my_side_panel").show(egui_ctx, |ui| {
+                    ui.heading("Hello World!");
+                });
+            });
 
-        for (i, position) in cube_positions.iter().enumerate() {
-            let mut model = glm::Mat4::identity();
-            model = glm::translate(&model, position);
-            let angle = glfw.get_time() + i as f64;
-            model = glm::rotate(&model, angle as f32, &glm::vec3(1., 0.3, 0.5));
+            unsafe {
+                gl::Enable(gl::DEPTH_TEST);
+                gl::ClearColor(0., 0., 0., 1.);
+                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+            }
+
+            texture.bind();
+            texture1.bind();
+
+            shader_program.use_program();
+
+            cam.process_input(keys_pushed, delta);
+            shader_program::uniform!(
+                shader_program,
+                UniformMatrix4fv,
+                "view",
+                1,
+                gl::FALSE,
+                glm::value_ptr(&cam.view_matrix()).as_ptr()
+            );
 
             shader_program::uniform!(
                 shader_program,
                 UniformMatrix4fv,
-                "model",
+                "projection",
                 1,
                 gl::FALSE,
-                glm::value_ptr(&model).as_ptr()
+                glm::value_ptr(&projection).as_ptr()
             );
 
-            unsafe {
-                gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            vao.bind();
+
+            for (i, position) in cube_positions.iter().enumerate() {
+                let mut model = glm::Mat4::identity();
+                model = glm::translate(&model, position);
+                let angle = start_time.elapsed().as_secs_f32() + i as f32;
+                model = glm::rotate(&model, angle, &glm::vec3(1., 0.3, 0.5));
+
+                shader_program::uniform!(
+                    shader_program,
+                    UniformMatrix4fv,
+                    "model",
+                    1,
+                    gl::FALSE,
+                    glm::value_ptr(&model).as_ptr()
+                );
+
+                unsafe {
+                    gl::DrawArrays(gl::TRIANGLES, 0, 36);
+                }
             }
+
+            counter += 1;
+            if time.elapsed() >= Duration::from_secs(1) {
+                println!("FPS: {}", counter);
+
+                time = Instant::now();
+                counter = 0;
+            }
+
+            egui.paint(&window);
+
+            gl_surface.swap_buffers(&gl_context).unwrap();
         }
-
-        counter += 1;
-        if time.elapsed() >= Duration::from_secs(1) {
-            println!("FPS: {}", counter);
-
-            time = Instant::now();
-            counter = 0;
-        }
-
-        window.swap_buffers();
-    }
-}
-
-fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
-    match event {
-        glfw::WindowEvent::FramebufferSize(width, height) => {
-            // make sure the viewport matches the new window dimensions; note that width and
-            // height will be significantly larger than specified on retina displays.
-            unsafe { gl::Viewport(0, 0, width, height) }
-        }
-
-        glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
-            window.set_should_close(true);
-        }
-
-        glfw::WindowEvent::Key(Key::F1, _, Action::Press, _) => unsafe {
-            gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
-        },
-
-        glfw::WindowEvent::Key(Key::F2, _, Action::Press, _) => unsafe {
-            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
-        },
-
-        _ => {}
-    }
+        _ => (),
+    });
 }

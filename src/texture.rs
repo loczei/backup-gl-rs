@@ -3,7 +3,7 @@ use std::{ffi::c_void, path::Path};
 
 use gl::types::GLenum;
 
-use image::{ io::Reader, DynamicImage };
+use image::{io::Reader, DynamicImage};
 
 pub enum TextureFormat {
     Rgb,
@@ -21,15 +21,12 @@ impl TextureFormat {
 
 pub struct Texture {
     id: u32,
-    number: i32
+    number: i32,
 }
 
 impl Texture {
     pub fn new(data: Vec<u8>, height: u32, width: u32, format: TextureFormat) -> Self {
-        let mut texture = Texture { 
-            id: 0,
-            number: -1
-        };
+        let mut texture = Texture { id: 0, number: -1 };
 
         unsafe {
             gl::GenTextures(1, &mut texture.id);
@@ -37,7 +34,11 @@ impl Texture {
 
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR_MIPMAP_LINEAR as i32);
+            gl::TexParameteri(
+                gl::TEXTURE_2D,
+                gl::TEXTURE_MIN_FILTER,
+                gl::LINEAR_MIPMAP_LINEAR as i32,
+            );
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
 
             gl::TexImage2D(
@@ -49,7 +50,7 @@ impl Texture {
                 0,
                 format.resolve(),
                 gl::UNSIGNED_BYTE,
-                &data[0] as *const u8 as *const c_void
+                &data[0] as *const u8 as *const c_void,
             );
             gl::GenerateMipmap(gl::TEXTURE_2D);
         }
@@ -58,8 +59,12 @@ impl Texture {
     }
 
     pub fn from_file(path: &str) -> Self {
-        let img = Reader::open(&Path::new(path)).unwrap()
-            .decode().unwrap().fliph().flipv();
+        let img = Reader::open(Path::new(path))
+            .unwrap()
+            .decode()
+            .unwrap()
+            .fliph()
+            .flipv();
 
         Self::new(
             img.as_bytes().to_vec(),
@@ -69,7 +74,7 @@ impl Texture {
                 DynamicImage::ImageRgb8(_) => TextureFormat::Rgb,
                 DynamicImage::ImageRgba8(_) => TextureFormat::Rgba,
                 _ => panic!("Ty kurwo jebana"),
-            }
+            },
         )
     }
 

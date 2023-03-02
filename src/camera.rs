@@ -1,57 +1,47 @@
-use glfw::{Action, Key, Window};
 use nalgebra_glm as glm;
+use winit::event::VirtualKeyCode;
 
 pub struct Camera {
     postition: glm::Vec3,
     front: glm::Vec3,
     up: glm::Vec3,
     speed: f32,
-    last_mouse_pos: glm::Vec2,
     yaw: f32,
     pitch: f32,
 }
 
 impl Camera {
-    pub fn process_input(&mut self, window: &Window, delta: f64) {
-        let speed = self.speed * delta as f32;
+    pub fn process_input(&mut self, keys: [bool; 165], delta: f32) {
+        let speed = self.speed * delta;
 
-        if window.get_key(Key::W) == Action::Press {
+        if keys[VirtualKeyCode::W as usize] {
             self.postition += self.front * speed;
         }
 
-        if window.get_key(Key::S) == Action::Press {
+        if keys[VirtualKeyCode::S as usize] {
             self.postition -= self.front * speed;
         }
 
-        if window.get_key(Key::A) == Action::Press {
+        if keys[VirtualKeyCode::A as usize] {
             self.postition -= glm::normalize(&glm::cross(&self.front, &self.up)) * speed;
         }
 
-        if window.get_key(Key::D) == Action::Press {
+        if keys[VirtualKeyCode::D as usize] {
             self.postition += glm::normalize(&glm::cross(&self.front, &self.up)) * speed;
         }
+    }
 
-        let mouse_pos = window.get_cursor_pos();
-
-        let mut xoffset = mouse_pos.0 as f32 - self.last_mouse_pos.x;
-        let mut yoffset = self.last_mouse_pos.y - mouse_pos.1 as f32;
-        self.last_mouse_pos.x = mouse_pos.0 as f32;
-        self.last_mouse_pos.y = mouse_pos.1 as f32;
+    pub fn mouse_input(&mut self, offset: (f64, f64)) {
+        let mut offset = offset;
 
         let sensitivity = 0.1;
-        xoffset *= sensitivity;
-        yoffset *= sensitivity;
+        offset.0 *= sensitivity;
+        offset.1 *= sensitivity;
 
-        self.yaw += xoffset;
-        self.pitch += yoffset;
+        self.yaw += offset.0 as f32;
+        self.pitch -= offset.1 as f32;
 
-        if self.pitch > 89. {
-            self.pitch = 89.;
-        }
-
-        if self.pitch < -89. {
-            self.pitch = -89.;
-        }
+        self.pitch = self.pitch.clamp(-89., 89.);
     }
 
     pub fn view_matrix(&mut self) -> glm::Mat4 {
@@ -73,7 +63,6 @@ impl Default for Camera {
             front: glm::vec3(0., 0., -1.),
             up: glm::vec3(0., 1., 0.),
             speed: 2.5,
-            last_mouse_pos: glm::vec2(400., 300.),
             yaw: -90.,
             pitch: 0.,
         }
