@@ -1,6 +1,6 @@
 extern crate gl;
 
-extern crate glfw;
+use egui::Slider;
 use glutin::{
     config::ConfigTemplateBuilder,
     context::ContextAttributesBuilder,
@@ -14,7 +14,7 @@ use raw_window_handle::HasRawWindowHandle;
 use winit::{
     dpi::Pixel,
     event::{DeviceEvent, ElementState, Event, VirtualKeyCode, WindowEvent},
-    event_loop::EventLoop,
+    event_loop::{EventLoop, EventLoopBuilder},
     window::{CursorGrabMode, WindowBuilder},
 };
 
@@ -81,7 +81,7 @@ const VERTICIES: [f32; 180] = [
 ];
 
 fn main() {
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoopBuilder::<()>::with_user_event().build();
 
     let window_builder = WindowBuilder::new().with_title("Learn OpenGL");
 
@@ -215,24 +215,29 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut delta = 0f32;
     let mut last_frame = Instant::now();
 
     window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
     window.set_cursor_visible(false);
+    let mut cursor_toggle = true;
+
+    let mut mix = 0f32;
 
     let mut keys_pushed: [bool; 165] = [false; 165];
 
     event_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent { event, .. } => match event {
-            WindowEvent::CloseRequested => {
-                control_flow.set_exit();
+        Event::WindowEvent { event, .. } => {
+            let _ = egui.on_event(&event);
+            match event {
+                WindowEvent::CloseRequested => {
+                    control_flow.set_exit();
+                }
+                WindowEvent::Resized(size) => unsafe {
+                    gl::Viewport(0, 0, size.width.cast(), size.height.cast())
+                },
+                _ => (),
             }
-            WindowEvent::Resized(size) => unsafe {
-                gl::Viewport(0, 0, size.width.cast(), size.height.cast())
-            },
-            _ => (),
-        },
+        }
         Event::DeviceEvent { event, .. } => match event {
             DeviceEvent::Key(input) => {
                 let key = input.virtual_keycode.unwrap();
@@ -251,6 +256,17 @@ fn main() {
                     VirtualKeyCode::F2 => {
                         unsafe { gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL) };
                     }
+                    VirtualKeyCode::T => {
+                        window.set_cursor_visible(cursor_toggle);
+                        window
+                            .set_cursor_grab(match cursor_toggle {
+                                false => CursorGrabMode::Confined,
+                                true => CursorGrabMode::None,
+                            })
+                            .unwrap();
+
+                        cursor_toggle = !cursor_toggle;
+                    }
                     VirtualKeyCode::Escape => {
                         control_flow.set_exit();
                     }
@@ -258,17 +274,23 @@ fn main() {
                 }
             }
             DeviceEvent::MouseMotion { delta } => {
-                cam.mouse_input(delta);
+                if cursor_toggle {
+                    cam.mouse_input(delta);
+                }
             }
             _ => (),
         },
         Event::MainEventsCleared => {
-            delta = last_frame.elapsed().as_secs_f32();
+            let delta = last_frame.elapsed().as_secs_f32();
             last_frame = Instant::now();
 
             egui.run(&window, |egui_ctx| {
-                egui::SidePanel::left("my_side_panel").show(egui_ctx, |ui| {
-                    ui.heading("Hello World!");
+                egui::Window::new("Options").show(egui_ctx, |ui| {
+                    ui.heading("Options!");
+
+                    ui.heading(format!("delta: {delta}"));
+
+                    ui.add(Slider::new(&mut mix, 0.0..=1.0).text("Texture mix: "));
                 });
             });
 
@@ -302,6 +324,8 @@ fn main() {
                 glm::value_ptr(&projection).as_ptr()
             );
 
+            shader_program::uniform!(shader_program, Uniform1f, "mixValue", mix);
+
             vao.bind();
 
             for (i, position) in cube_positions.iter().enumerate() {
@@ -327,6 +351,7 @@ fn main() {
             counter += 1;
             if time.elapsed() >= Duration::from_secs(1) {
                 println!("FPS: {}", counter);
+                println!("Mix: {mix}");
 
                 time = Instant::now();
                 counter = 0;
