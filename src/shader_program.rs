@@ -1,8 +1,8 @@
 extern crate gl;
 use gl::types::GLchar;
 
-use std::ptr;
 use std::ffi::CString;
+use std::ptr;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -10,7 +10,7 @@ use std::path::Path;
 
 pub enum ShaderType {
     Fragment,
-    Vertex
+    Vertex,
 }
 
 pub struct Shader {
@@ -21,7 +21,9 @@ pub struct Shader {
 
 impl Drop for Shader {
     fn drop(&mut self) {
-        unsafe { gl::DeleteShader(self.id); }
+        unsafe {
+            gl::DeleteShader(self.id);
+        }
     }
 }
 
@@ -29,24 +31,18 @@ impl Shader {
     pub fn new(source: &str, t: ShaderType) -> Shader {
         let mut shader = Shader { id: 0, t };
 
-        unsafe { 
+        unsafe {
             shader.id = match shader.t {
                 ShaderType::Vertex => gl::CreateShader(gl::VERTEX_SHADER),
                 ShaderType::Fragment => gl::CreateShader(gl::FRAGMENT_SHADER),
             };
-            
-            let c_str_source = CString::new(source.as_bytes()).unwrap(); 
 
-            gl::ShaderSource(
-                shader.id,
-                1,
-                &c_str_source.as_ptr(),
-                ptr::null()
-            );
+            let c_str_source = CString::new(source.as_bytes()).unwrap();
+
+            gl::ShaderSource(shader.id, 1, &c_str_source.as_ptr(), ptr::null());
 
             gl::CompileShader(shader.id);
             check_errors(shader.id, true);
-
         };
 
         shader
@@ -74,7 +70,7 @@ pub struct ShaderProgram {
 
 impl Builder {
     fn new() -> Self {
-        unsafe { 
+        unsafe {
             Self {
                 id: gl::CreateProgram(),
                 attached_shaders: Vec::new(),
@@ -95,17 +91,15 @@ impl Builder {
     pub fn link(self) -> ShaderProgram {
         unsafe {
             gl::LinkProgram(self.id);
-            
+
             check_errors(self.id, false);
 
             for shader in self.attached_shaders {
                 drop(shader);
             }
-        } 
-
-        ShaderProgram {
-            id: self.id
         }
+
+        ShaderProgram { id: self.id }
     }
 }
 
@@ -121,7 +115,9 @@ impl ShaderProgram {
 
 impl Drop for ShaderProgram {
     fn drop(&mut self) {
-        unsafe { gl::DeleteProgram(self.id); }
+        unsafe {
+            gl::DeleteProgram(self.id);
+        }
     }
 }
 
@@ -130,8 +126,8 @@ macro_rules! uniform {
         {
             let c_str = CString::new($name.as_bytes()).unwrap();
 
-            unsafe { 
-                gl::$uniform_name(gl::GetUniformLocation($self.id, c_str.as_ptr()), $($arg), +); 
+            unsafe {
+                gl::$uniform_name(gl::GetUniformLocation($self.id, c_str.as_ptr()), $($arg), +);
             }
         }
     };
@@ -142,11 +138,9 @@ pub(crate) use uniform;
 // true == shader, false == program
 fn check_errors(id: u32, t: bool) {
     let mut success: i32 = i32::from(gl::FALSE);
-    let mut info_log = Vec::with_capacity(512);
-    
-    unsafe {
-        info_log.set_len(512 - 1);
+    let mut info_log = vec![0u8; 512];
 
+    unsafe {
         if t {
             gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
         } else {
@@ -154,12 +148,28 @@ fn check_errors(id: u32, t: bool) {
         }
 
         if success != i32::from(gl::TRUE) {
-            if t { 
-                gl::GetShaderInfoLog(id, 512, ptr::null_mut(), info_log.as_mut_ptr() as *mut GLchar);
-                println!("ERROR::SHADER::COMPILATION_ERROR\n {}", std::string::String::from_utf8_lossy(&info_log));
-            } else { 
-                gl::GetProgramInfoLog(id, 512, ptr::null_mut(), info_log.as_mut_ptr() as *mut GLchar);
-                println!("ERROR::PROGRAM::LINKING_ERROR\n {}", std::string::String::from_utf8_lossy(&info_log));
+            if t {
+                gl::GetShaderInfoLog(
+                    id,
+                    512,
+                    ptr::null_mut(),
+                    info_log.as_mut_ptr() as *mut GLchar,
+                );
+                println!(
+                    "ERROR::SHADER::COMPILATION_ERROR\n {}",
+                    std::string::String::from_utf8_lossy(&info_log)
+                );
+            } else {
+                gl::GetProgramInfoLog(
+                    id,
+                    512,
+                    ptr::null_mut(),
+                    info_log.as_mut_ptr() as *mut GLchar,
+                );
+                println!(
+                    "ERROR::PROGRAM::LINKING_ERROR\n {}",
+                    std::string::String::from_utf8_lossy(&info_log)
+                );
             }
         }
     }

@@ -5,8 +5,8 @@ use std::ffi::c_void;
 use gl::types::GLenum;
 
 pub enum BufferType {
-   Array,
-   ElementArray
+    Array,
+    ElementArray,
 }
 
 pub enum DrawType {
@@ -24,22 +24,19 @@ impl Buffer {
 
         unsafe { gl::GenBuffers(1, &mut buffer.id) };
 
-        buffer 
+        buffer
     }
 
-    fn resolve_type(t: &BufferType) -> GLenum { 
+    fn resolve_type(t: &BufferType) -> GLenum {
         match t {
             BufferType::Array => gl::ARRAY_BUFFER,
-            BufferType::ElementArray => gl::ELEMENT_ARRAY_BUFFER
+            BufferType::ElementArray => gl::ELEMENT_ARRAY_BUFFER,
         }
     }
 
     pub fn bind(&self) {
-        unsafe { 
-            gl::BindBuffer(
-                Self::resolve_type(&self.t),
-                self.id
-            ); 
+        unsafe {
+            gl::BindBuffer(Self::resolve_type(&self.t), self.id);
         };
     }
 
@@ -52,8 +49,8 @@ impl Buffer {
                 (SIZE * std::mem::size_of::<T>()) as isize,
                 &data[0] as *const T as *const c_void,
                 match t {
-                    DrawType::StaticDraw => gl::STATIC_DRAW
-                }   
+                    DrawType::StaticDraw => gl::STATIC_DRAW,
+                },
             );
         };
     }

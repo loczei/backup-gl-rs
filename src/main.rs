@@ -14,7 +14,7 @@ use raw_window_handle::HasRawWindowHandle;
 use winit::{
     dpi::Pixel,
     event::{DeviceEvent, ElementState, Event, VirtualKeyCode, WindowEvent},
-    event_loop::{EventLoop, EventLoopBuilder},
+    event_loop::EventLoopBuilder,
     window::{CursorGrabMode, WindowBuilder},
 };
 
@@ -34,51 +34,7 @@ use shader_program::{Shader, ShaderProgram, ShaderType};
 use vertex_array::VertexArray;
 mod camera;
 use camera::Camera;
-
-#[rustfmt::skip]
-const VERTICIES: [f32; 180] = [
-    -0.5, -0.5, -0.5,  0.0, 0.0,
-    0.5, -0.5, -0.5,  1.0, 0.0,
-    0.5,  0.5, -0.5,  1.0, 1.0,
-    0.5,  0.5, -0.5,  1.0, 1.0,
-    -0.5,  0.5, -0.5,  0.0, 1.0,
-    -0.5, -0.5, -0.5,  0.0, 0.0,
-
-    -0.5, -0.5,  0.5,  0.0, 0.0,
-    0.5, -0.5,  0.5,  1.0, 0.0,
-    0.5,  0.5,  0.5,  1.0, 1.0,
-    0.5,  0.5,  0.5,  1.0, 1.0,
-    -0.5,  0.5,  0.5,  0.0, 1.0,
-    -0.5, -0.5,  0.5,  0.0, 0.0,
-
-    -0.5,  0.5,  0.5,  1.0, 0.0,
-    -0.5,  0.5, -0.5,  1.0, 1.0,
-    -0.5, -0.5, -0.5,  0.0, 1.0,
-    -0.5, -0.5, -0.5,  0.0, 1.0,
-    -0.5, -0.5,  0.5,  0.0, 0.0,
-    -0.5,  0.5,  0.5,  1.0, 0.0,
-
-    0.5,  0.5,  0.5,  1.0, 0.0,
-    0.5,  0.5, -0.5,  1.0, 1.0,
-    0.5, -0.5, -0.5,  0.0, 1.0,
-    0.5, -0.5, -0.5,  0.0, 1.0,
-    0.5, -0.5,  0.5,  0.0, 0.0,
-    0.5,  0.5,  0.5,  1.0, 0.0,
-
-    -0.5, -0.5, -0.5,  0.0, 1.0,
-    0.5, -0.5, -0.5,  1.0, 1.0,
-    0.5, -0.5,  0.5,  1.0, 0.0,
-    0.5, -0.5,  0.5,  1.0, 0.0,
-    -0.5, -0.5,  0.5,  0.0, 0.0,
-    -0.5, -0.5, -0.5,  0.0, 1.0,
-
-    -0.5,  0.5, -0.5,  0.0, 1.0,
-    0.5,  0.5, -0.5,  1.0, 1.0,
-    0.5,  0.5,  0.5,  1.0, 0.0,
-    0.5,  0.5,  0.5,  1.0, 0.0,
-    -0.5,  0.5,  0.5,  0.0, 0.0,
-    -0.5,  0.5, -0.5,  0.0, 1.0
-];
+mod verticies;
 
 fn main() {
     let event_loop = EventLoopBuilder::<()>::with_user_event().build();
@@ -177,7 +133,7 @@ fn main() {
 
     vao.bind();
 
-    vbo.data::<f32, 180>(VERTICIES, DrawType::StaticDraw);
+    vbo.data::<f32, 180>(verticies::VERTICIES, DrawType::StaticDraw);
 
     unsafe {
         gl::VertexAttribPointer(
@@ -221,7 +177,7 @@ fn main() {
     window.set_cursor_visible(false);
     let mut cursor_toggle = true;
 
-    let mut mix = 0f32;
+    let mut mix = 0.20f32;
 
     let mut keys_pushed: [bool; 165] = [false; 165];
 
@@ -265,6 +221,7 @@ fn main() {
                             })
                             .unwrap();
 
+                        println!("Mix: {mix}");
                         cursor_toggle = !cursor_toggle;
                     }
                     VirtualKeyCode::Escape => {
@@ -290,7 +247,7 @@ fn main() {
 
                     ui.heading(format!("delta: {delta}"));
 
-                    ui.add(Slider::new(&mut mix, 0.0..=1.0).text("Texture mix: "));
+                    ui.add(Slider::new(&mut mix, 0.0..=1.0).text(" Texture mix"));
                 });
             });
 
@@ -351,7 +308,6 @@ fn main() {
             counter += 1;
             if time.elapsed() >= Duration::from_secs(1) {
                 println!("FPS: {}", counter);
-                println!("Mix: {mix}");
 
                 time = Instant::now();
                 counter = 0;
