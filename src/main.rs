@@ -1,21 +1,13 @@
 extern crate gl;
 
 use egui::Slider;
-use glutin::{
-    config::ConfigTemplateBuilder,
-    context::ContextAttributesBuilder,
-    display::GetGlDisplay,
-    prelude::{GlConfig, GlDisplay, NotCurrentGlContextSurfaceAccessor},
-    surface::GlSurface,
-};
-use glutin_winit::{DisplayBuilder, GlWindow};
+use glutin::{prelude::GlDisplay, surface::GlSurface};
 use nalgebra_glm as glm;
-use raw_window_handle::HasRawWindowHandle;
 use winit::{
     dpi::Pixel,
     event::{DeviceEvent, ElementState, Event, VirtualKeyCode, WindowEvent},
     event_loop::EventLoopBuilder,
-    window::{CursorGrabMode, WindowBuilder},
+    window::CursorGrabMode,
 };
 
 use std::{
@@ -34,65 +26,21 @@ use shader_program::{Shader, ShaderProgram, ShaderType};
 use vertex_array::VertexArray;
 mod camera;
 use camera::Camera;
+mod init;
 mod verticies;
 
 fn main() {
     let event_loop = EventLoopBuilder::<()>::with_user_event().build();
 
-    let window_builder = WindowBuilder::new().with_title("Learn OpenGL");
-
-    let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
-
-    let (window, gl_config) = display_builder
-        .build(&event_loop, ConfigTemplateBuilder::new(), |configs| {
-            configs
-                .reduce(|a, b| {
-                    if a.num_samples() > b.num_samples() {
-                        a
-                    } else {
-                        b
-                    }
-                })
-                .unwrap()
-        })
-        .unwrap();
-
-    let window = window.unwrap();
-
-    let gl_display = gl_config.display();
-
-    let attrs = window.build_surface_attributes(<_>::default());
-    let gl_surface = unsafe {
-        gl_display
-            .create_window_surface(&gl_config, &attrs)
-            .unwrap()
-    };
-
-    let context_attrs = ContextAttributesBuilder::new().build(Some(window.raw_window_handle()));
-    let gl_context = unsafe {
-        gl_display
-            .create_context(&gl_config, &context_attrs)
-            .unwrap()
-            .make_current(&gl_surface)
-            .unwrap()
-    };
+    let (gl_display, gl_surface, gl_context, window) =
+        init::create_window_with_opengl_context(&event_loop);
 
     gl::load_with(|s| {
         let s = CString::new(s).unwrap();
         gl_display.get_proc_address(s.as_c_str()).cast()
     });
 
-    let glow = unsafe {
-        glow::Context::from_loader_function(|s| {
-            let s = CString::new(s).unwrap();
-
-            gl_display.get_proc_address(&s)
-        })
-    };
-
-    let glow = std::sync::Arc::new(glow);
-
-    let mut egui = egui_glow::EguiGlow::new(&event_loop, glow, None);
+    let mut egui = init::init_egui(&event_loop, &gl_display);
 
     unsafe {
         gl::Viewport(0, 0, 800, 600);
@@ -221,7 +169,6 @@ fn main() {
                             })
                             .unwrap();
 
-                        println!("Mix: {mix}");
                         cursor_toggle = !cursor_toggle;
                     }
                     VirtualKeyCode::Escape => {
@@ -246,6 +193,7 @@ fn main() {
                     ui.heading("Options!");
 
                     ui.heading(format!("delta: {delta}"));
+                    ui.heading(format!("FPS: {}", (1. / delta)));
 
                     ui.add(Slider::new(&mut mix, 0.0..=1.0).text(" Texture mix"));
                 });
