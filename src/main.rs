@@ -28,19 +28,19 @@ mod camera;
 use camera::Camera;
 mod init;
 mod verticies;
+mod window;
 
 fn main() {
     let event_loop = EventLoopBuilder::<()>::with_user_event().build();
 
-    let (gl_display, gl_surface, gl_context, window) =
-        init::create_window_with_opengl_context(&event_loop);
+    let window = window::WindowBuilder::default().build(&event_loop);
 
     gl::load_with(|s| {
         let s = CString::new(s).unwrap();
-        gl_display.get_proc_address(s.as_c_str()).cast()
+        window.get_proc_address(s.as_c_str()).cast()
     });
 
-    let mut egui = init::init_egui(&event_loop, &gl_display);
+    let mut egui = init::init_egui(&event_loop, &window);
 
     unsafe {
         gl::Viewport(0, 0, 800, 600);
@@ -121,8 +121,11 @@ fn main() {
 
     let mut last_frame = Instant::now();
 
-    window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
-    window.set_cursor_visible(false);
+    window
+        .window
+        .set_cursor_grab(CursorGrabMode::Confined)
+        .unwrap();
+    window.window.set_cursor_visible(false);
     let mut cursor_toggle = true;
 
     let mut mix = 0.20f32;
@@ -161,8 +164,9 @@ fn main() {
                         unsafe { gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL) };
                     }
                     VirtualKeyCode::T => {
-                        window.set_cursor_visible(cursor_toggle);
+                        window.window.set_cursor_visible(cursor_toggle);
                         window
+                            .window
                             .set_cursor_grab(match cursor_toggle {
                                 false => CursorGrabMode::Confined,
                                 true => CursorGrabMode::None,
@@ -188,7 +192,7 @@ fn main() {
             let delta = last_frame.elapsed().as_secs_f32();
             last_frame = Instant::now();
 
-            egui.run(&window, |egui_ctx| {
+            egui.run(&window.window, |egui_ctx| {
                 egui::Window::new("Options").show(egui_ctx, |ui| {
                     ui.heading("Options!");
 
@@ -261,9 +265,9 @@ fn main() {
                 counter = 0;
             }
 
-            egui.paint(&window);
+            egui.paint(&window.window);
 
-            gl_surface.swap_buffers(&gl_context).unwrap();
+            window.swap_buffer();
         }
         _ => (),
     });
