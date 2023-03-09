@@ -41,7 +41,7 @@ impl Window {
 
         let glow = std::sync::Arc::new(glow);
 
-        egui_glow::EguiGlow::new(&event_loop, glow, None)
+        egui_glow::EguiGlow::new(event_loop, glow, None)
     }
 }
 
@@ -78,7 +78,7 @@ impl WindowBuilder {
         self.display = self.display.with_window_builder(Some(self.window));
         let (window, gl_config) = self
             .display
-            .build(&event_loop, ConfigTemplateBuilder::new(), |configs| {
+            .build(event_loop, ConfigTemplateBuilder::new(), |configs| {
                 configs
                     .reduce(|a, b| {
                         if a.num_samples() > b.num_samples() {

@@ -26,6 +26,12 @@ impl VertexArray {
     }
 }
 
+impl Default for VertexArray {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for VertexArray {
     fn drop(&mut self) {
         unsafe {
