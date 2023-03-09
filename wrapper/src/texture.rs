@@ -1,4 +1,3 @@
-extern crate gl;
 use std::{ffi::c_void, path::Path};
 
 use gl::types::GLenum;

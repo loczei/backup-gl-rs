@@ -1,14 +1,10 @@
-extern crate gl;
-
 pub struct VertexArray {
     pub id: u32,
 }
 
 impl VertexArray {
     pub fn new() -> Self {
-        let mut arr = Self {
-            id: 0
-        };
+        let mut arr = Self { id: 0 };
 
         unsafe {
             gl::GenVertexArrays(1, &mut arr.id);

@@ -12,6 +12,9 @@ use glutin_winit::{DisplayBuilder, GlWindow};
 use raw_window_handle::HasRawWindowHandle;
 use winit::event_loop::EventLoop;
 
+#[cfg(feature = "egui-init")]
+use egui_glow::EguiGlow;
+
 pub struct Window {
     pub window: winit::window::Window,
     gl_display: Display,
@@ -27,8 +30,22 @@ impl Window {
     pub fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
         self.gl_display.get_proc_address(addr)
     }
+
+    #[cfg(feature = "egui-init")]
+    pub fn init_egui<T>(&self, event_loop: &EventLoop<T>) -> EguiGlow {
+        let glow = unsafe {
+            glow::Context::from_loader_function(|s| {
+                self.get_proc_address(std::ffi::CString::new(s).unwrap().as_c_str())
+            })
+        };
+
+        let glow = std::sync::Arc::new(glow);
+
+        egui_glow::EguiGlow::new(&event_loop, glow, None)
+    }
 }
 
+#[derive(Default)]
 pub struct WindowBuilder {
     window: winit::window::WindowBuilder,
     display: DisplayBuilder,
@@ -98,17 +115,6 @@ impl WindowBuilder {
             gl_display,
             gl_context,
             gl_surface,
-        }
-    }
-}
-
-impl Default for WindowBuilder {
-    fn default() -> Self {
-        Self {
-            window: winit::window::WindowBuilder::default(),
-            display: DisplayBuilder::default(),
-            context: ContextAttributesBuilder::default(),
-            surface: SurfaceAttributesBuilder::default(),
         }
     }
 }

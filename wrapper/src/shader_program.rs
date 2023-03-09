@@ -1,4 +1,3 @@
-extern crate gl;
 use gl::types::GLchar;
 
 use std::ffi::CString;
@@ -121,6 +120,7 @@ impl Drop for ShaderProgram {
     }
 }
 
+#[macro_export]
 macro_rules! uniform {
     ($self:ident, $uniform_name:ident, $name:expr, $($arg:expr),+) => {
         {
@@ -133,7 +133,7 @@ macro_rules! uniform {
     };
 }
 
-pub(crate) use uniform;
+pub use uniform;
 
 // true == shader, false == program
 fn check_errors(id: u32, t: bool) {

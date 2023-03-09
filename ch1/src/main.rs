@@ -1,7 +1,9 @@
-extern crate gl;
+use std::{
+    ffi::{c_void, CString},
+    time::{Duration, Instant},
+};
 
 use egui::Slider;
-use glutin::{prelude::GlDisplay, surface::GlSurface};
 use nalgebra_glm as glm;
 use winit::{
     dpi::Pixel,
@@ -10,37 +12,30 @@ use winit::{
     window::CursorGrabMode,
 };
 
-use std::{
-    ffi::{c_void, CString},
-    time::{Duration, Instant},
+use window_creator::window::WindowBuilder;
+use wrapper::{
+    buffer::{Buffer, BufferType, DrawType},
+    camera::Camera,
+    shader_program::{self, Shader, ShaderProgram, ShaderType},
+    texture::Texture,
+    vertex_array::VertexArray,
 };
 
-#[macro_use]
-mod shader_program;
-mod buffer;
-mod texture;
-use buffer::{Buffer, BufferType, DrawType};
-use texture::Texture;
-mod vertex_array;
-use shader_program::{Shader, ShaderProgram, ShaderType};
-use vertex_array::VertexArray;
-mod camera;
-use camera::Camera;
-mod init;
 mod verticies;
-mod window;
 
 fn main() {
     let event_loop = EventLoopBuilder::<()>::with_user_event().build();
 
-    let window = window::WindowBuilder::default().build(&event_loop);
+    let window = WindowBuilder::default()
+        .window(winit::window::WindowBuilder::new().with_title("LearnOpenGL"))
+        .build(&event_loop);
 
     gl::load_with(|s| {
         let s = CString::new(s).unwrap();
         window.get_proc_address(s.as_c_str()).cast()
     });
 
-    let mut egui = init::init_egui(&event_loop, &window);
+    let mut egui = window.init_egui(&event_loop);
 
     unsafe {
         gl::Viewport(0, 0, 800, 600);

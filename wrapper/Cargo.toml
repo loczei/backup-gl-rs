@@ -1,0 +1,12 @@
+[package]
+name = "wrapper"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gl = "0.6.0"
+image = "0.24.3"
+nalgebra-glm = "0.18.0"
+winit = "0.28.2" 
