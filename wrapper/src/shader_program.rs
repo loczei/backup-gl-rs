@@ -7,6 +7,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
+use nalgebra_glm as glm;
+
 pub enum ShaderType {
     Fragment,
     Vertex,
@@ -109,6 +111,31 @@ impl ShaderProgram {
 
     pub fn use_program(&self) {
         unsafe { gl::UseProgram(self.id) }
+    }
+
+    //common used uniforms
+
+    pub fn set_vec3f(&self, name: &str, vec: &glm::Vec3) {
+        uniform!(self, Uniform3fv, name, 1, glm::value_ptr(vec).as_ptr());
+    }
+
+    pub fn set_mat4f(&self, name: &str, mat: &glm::Mat4) {
+        uniform!(
+            self,
+            UniformMatrix4fv,
+            name,
+            1,
+            gl::FALSE,
+            glm::value_ptr(mat).as_ptr()
+        );
+    }
+
+    pub fn set_float(&self, name: &str, value: f32) {
+        uniform!(self, Uniform1f, name, value);
+    }
+
+    pub fn set_uint(&self, name: &str, value: u32) {
+        uniform!(self, Uniform1ui, name, value);
     }
 }
 

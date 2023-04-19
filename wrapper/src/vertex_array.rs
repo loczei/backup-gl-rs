@@ -1,3 +1,7 @@
+use std::ffi::c_void;
+
+use gl::types::{GLboolean, GLenum};
+
 pub struct VertexArray {
     pub id: u32,
 }
@@ -24,6 +28,34 @@ impl VertexArray {
             gl::BindVertexArray(0);
         }
     }
+
+    pub fn vertex_atrrib_pointer<T: GlType>(
+        index: u32,
+        size: i32,
+        normalized: GLboolean,
+        step: usize,
+        pointer: usize,
+    ) {
+        unsafe {
+            gl::VertexAttribPointer(
+                index,
+                size,
+                T::resolve(),
+                normalized,
+                (step * std::mem::size_of::<T>()) as i32,
+                match pointer {
+                    0 => std::ptr::null(),
+                    x => (x * std::mem::size_of::<T>()) as i32 as *const c_void,
+                },
+            );
+        }
+    }
+
+    pub fn enable_vertex_attrib_array(i: u32) {
+        unsafe {
+            gl::EnableVertexAttribArray(i);
+        }
+    }
 }
 
 impl Default for VertexArray {
@@ -37,5 +69,15 @@ impl Drop for VertexArray {
         unsafe {
             gl::DeleteVertexArrays(1, &self.id);
         }
+    }
+}
+
+pub trait GlType {
+    fn resolve() -> GLenum;
+}
+
+impl GlType for f32 {
+    fn resolve() -> GLenum {
+        gl::FLOAT
     }
 }

@@ -1,7 +1,4 @@
-use std::{
-    ffi::{c_void, CString},
-    time::{Duration, Instant},
-};
+use std::{ffi::CString, time::Instant};
 
 use egui::Slider;
 use nalgebra_glm as glm;
@@ -16,8 +13,7 @@ use window_creator::window::WindowBuilder;
 use wrapper::{
     buffer::{Buffer, BufferType, DrawType},
     camera::Camera,
-    shader_program::{self, Shader, ShaderProgram, ShaderType},
-    texture::Texture,
+    shader_program::{Shader, ShaderProgram, ShaderType},
     vertex_array::VertexArray,
 };
 
@@ -42,19 +38,6 @@ fn main() {
         gl::Enable(gl::DEPTH_TEST);
     }
 
-    let cube_positions: [glm::Vec3; 10] = [
-        glm::vec3(0.0, 0.0, 0.0),
-        glm::vec3(2.0, 5.0, -15.0),
-        glm::vec3(-1.5, -2.2, -2.5),
-        glm::vec3(-3.8, -2.0, -12.3),
-        glm::vec3(2.4, -0.4, -3.5),
-        glm::vec3(-1.7, 3.0, -7.5),
-        glm::vec3(1.3, -2.0, -2.5),
-        glm::vec3(1.5, 2.0, -2.5),
-        glm::vec3(1.5, 0.2, -1.5),
-        glm::vec3(-1.3, 1.0, -1.5),
-    ];
-
     let shader_program = ShaderProgram::builder()
         .attach(Shader::from_file("shaders/vertex.vert", ShaderType::Vertex))
         .attach(Shader::from_file(
@@ -63,56 +46,42 @@ fn main() {
         ))
         .link();
 
-    Texture::active_number(0);
-    let mut texture = Texture::from_file("resources/container.jpg");
-    texture.set_activate_number(0);
-
-    Texture::active_number(0);
-    let mut texture1 = Texture::from_file("resources/awesomeface.png");
-    texture1.set_activate_number(1);
-
     let vbo = Buffer::new(BufferType::Array);
     let vao = VertexArray::new();
 
+    vbo.data::<f32, 216>(verticies::VERTICIES, DrawType::StaticDraw);
+
     vao.bind();
 
-    vbo.data::<f32, 180>(verticies::VERTICIES, DrawType::StaticDraw);
-
-    unsafe {
-        gl::VertexAttribPointer(
-            0,
-            3,
-            gl::FLOAT,
-            gl::FALSE,
-            (5 * std::mem::size_of::<f32>()) as i32,
-            std::ptr::null(),
-        );
-        gl::EnableVertexAttribArray(0);
-
-        gl::VertexAttribPointer(
-            1,
-            2,
-            gl::FLOAT,
-            gl::FALSE,
-            (5 * std::mem::size_of::<f32>()) as i32,
-            (3 * std::mem::size_of::<f32>()) as i32 as *const c_void,
-        );
-        gl::EnableVertexAttribArray(1);
-    }
-
-    shader_program.use_program();
-    shader_program::uniform!(shader_program, Uniform1i, "texture1", 0);
-    shader_program::uniform!(shader_program, Uniform1i, "texture2", 1);
+    VertexArray::vertex_atrrib_pointer::<f32>(0, 3, gl::FALSE, 6, 0);
+    VertexArray::enable_vertex_attrib_array(0);
+    VertexArray::vertex_atrrib_pointer::<f32>(1, 3, gl::FALSE, 6, 3);
+    VertexArray::enable_vertex_attrib_array(1);
 
     VertexArray::unbind();
 
+    let light_vao = VertexArray::new();
+    light_vao.bind();
+
+    vbo.bind();
+
+    VertexArray::vertex_atrrib_pointer::<f32>(0, 3, gl::FALSE, 6, 0);
+    VertexArray::enable_vertex_attrib_array(0);
+    VertexArray::vertex_atrrib_pointer::<f32>(1, 3, gl::FALSE, 6, 3);
+    VertexArray::enable_vertex_attrib_array(1);
+
+    VertexArray::unbind();
+
+    let light_shader = ShaderProgram::builder()
+        .attach(Shader::from_file("shaders/vertex.vert", ShaderType::Vertex))
+        .attach(Shader::from_file(
+            "shaders/light.frag",
+            ShaderType::Fragment,
+        ))
+        .link();
+
     let mut cam = Camera::default();
     let projection = glm::perspective(800. / 600., (45f32).to_radians(), 0.1, 100.);
-
-    let mut time = Instant::now();
-    let mut counter = 0;
-
-    let start_time = Instant::now();
 
     let mut last_frame = Instant::now();
 
@@ -121,9 +90,14 @@ fn main() {
         .set_cursor_grab(CursorGrabMode::Confined)
         .unwrap();
     window.window.set_cursor_visible(false);
-    let mut cursor_toggle = true;
 
-    let mut mix = 0.20f32;
+    let mut specular_strength = 0.5f32;
+    let mut ambient_strength = 0.1f32;
+    let mut shininess = 32;
+
+    let start_time = Instant::now();
+
+    let mut cursor_toggle = true;
 
     let mut keys_pushed: [bool; 165] = [false; 165];
 
@@ -194,7 +168,15 @@ fn main() {
                     ui.heading(format!("delta: {delta}"));
                     ui.heading(format!("FPS: {}", (1. / delta)));
 
-                    ui.add(Slider::new(&mut mix, 0.0..=1.0).text(" Texture mix"));
+                    ui.add(
+                        Slider::new(&mut specular_strength, 0.0..=1.0).text("Specular Strength"),
+                    );
+                    ui.add(Slider::new(&mut ambient_strength, 0.0..=1.0).text("Ambient Strength"));
+                    ui.add(
+                        Slider::new(&mut shininess, 0..=1024)
+                            .text("Shininess")
+                            .logarithmic(true),
+                    );
                 });
             });
 
@@ -204,60 +186,50 @@ fn main() {
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
             }
 
-            texture.bind();
-            texture1.bind();
+            let angle = start_time.elapsed().as_secs_f32();
 
-            shader_program.use_program();
+            let light_pos = glm::vec3(2. * angle.sin(), 0., angle.cos());
 
             cam.process_input(keys_pushed, delta);
-            shader_program::uniform!(
-                shader_program,
-                UniformMatrix4fv,
-                "view",
-                1,
-                gl::FALSE,
-                glm::value_ptr(&cam.view_matrix()).as_ptr()
-            );
 
-            shader_program::uniform!(
-                shader_program,
-                UniformMatrix4fv,
-                "projection",
-                1,
-                gl::FALSE,
-                glm::value_ptr(&projection).as_ptr()
-            );
+            shader_program.use_program();
+            shader_program.set_mat4f("view", &cam.view_matrix());
+            shader_program.set_mat4f("projection", &projection);
 
-            shader_program::uniform!(shader_program, Uniform1f, "mixValue", mix);
+            shader_program.set_vec3f("objectColor", &glm::vec3(1., 0.5, 0.31));
+            shader_program.set_vec3f("lightColor", &glm::vec3(1., 1., 1.));
+            shader_program.set_vec3f("lightPos", &light_pos);
+            shader_program.set_vec3f("viewPos", &cam.postition);
+            shader_program.set_float("specularStrength", specular_strength);
+            shader_program.set_float("ambientStrength", ambient_strength);
+            shader_program.set_uint("shininess", shininess);
+
+            let mut model = glm::Mat4::identity();
+            model = glm::translate(&model, &glm::vec3(0., 0., 0.));
+
+            shader_program.set_mat4f("model", &model);
 
             vao.bind();
 
-            for (i, position) in cube_positions.iter().enumerate() {
-                let mut model = glm::Mat4::identity();
-                model = glm::translate(&model, position);
-                let angle = start_time.elapsed().as_secs_f32() + i as f32;
-                model = glm::rotate(&model, angle, &glm::vec3(1., 0.3, 0.5));
-
-                shader_program::uniform!(
-                    shader_program,
-                    UniformMatrix4fv,
-                    "model",
-                    1,
-                    gl::FALSE,
-                    glm::value_ptr(&model).as_ptr()
-                );
-
-                unsafe {
-                    gl::DrawArrays(gl::TRIANGLES, 0, 36);
-                }
+            unsafe {
+                gl::DrawArrays(gl::TRIANGLES, 0, 36);
             }
 
-            counter += 1;
-            if time.elapsed() >= Duration::from_secs(1) {
-                println!("FPS: {}", counter);
+            light_shader.use_program();
 
-                time = Instant::now();
-                counter = 0;
+            light_shader.set_mat4f("view", &cam.view_matrix());
+            light_shader.set_mat4f("projection", &projection);
+
+            let mut model = glm::Mat4::identity();
+            model = glm::translate(&model, &light_pos);
+            model = glm::scale(&model, &glm::vec3(0.2, 0.2, 0.2));
+
+            light_shader.set_mat4f("model", &model);
+
+            light_vao.bind();
+
+            unsafe {
+                gl::DrawArrays(gl::TRIANGLES, 0, 36);
             }
 
             egui.paint(&window.window);

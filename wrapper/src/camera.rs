@@ -2,7 +2,7 @@ use nalgebra_glm as glm;
 use winit::event::VirtualKeyCode;
 
 pub struct Camera {
-    postition: glm::Vec3,
+    pub postition: glm::Vec3,
     front: glm::Vec3,
     up: glm::Vec3,
     speed: f32,
